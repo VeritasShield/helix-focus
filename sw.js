@@ -1,4 +1,4 @@
-const CACHE_NAME = 'helix-focus-1775626585';
+const CACHE_NAME = 'helix-focus-1775626945';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

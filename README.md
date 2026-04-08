@@ -3,18 +3,22 @@
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
 ![Web MIDI](https://img.shields.io/badge/Web_MIDI_API-0078D4?style=for-the-badge&logo=web&logoColor=white)
+![PWA](https://img.shields.io/badge/PWA-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white)
 
-**Helix Focus** es una aplicación web *Zero-Install* diseñada para guitarristas y productores que utilizan procesadores **Line 6 (Helix, HX Stomp)**. Transforma tu dispositivo móvil o tablet en un Pad XY táctil de alta respuesta para realizar un *Morphing* (interpolación) continuo entre 4 presets (nodos) distintos en tiempo real.
+**Helix Focus** es una Progressive Web App (PWA) *Zero-Install* diseñada para guitarristas y productores que utilizan procesadores **Line 6 (Helix, HX Stomp)**. Transforma tu dispositivo móvil o tablet en un Pad XY táctil de alta respuesta para realizar un *Morphing* (interpolación) continuo entre 4 presets (nodos) distintos en tiempo real.
 
 ## ✨ Características Principales
 
-- **Interpolación Bilineal:** Mezcla parámetros de 4 archivos `.hlx` de forma fluida según las coordenadas XY del pad.
+- **Interpolación Bilineal y Lerp:** Mezcla parámetros de 4 archivos `.hlx` de forma fluida, sumando un motor de inercia matemática (Lerp) para transiciones de audio "cremosas" y sin saltos abruptos.
+- **Offline-First & PWA:** Instalable como aplicación nativa en tu dispositivo. Gracias a su Service Worker, **funciona sin conexión a internet** después de la primera visita.
 - **Zero-Install & Cloud-Free:** 100% Vanilla JS. Todo ocurre en el navegador de tu cliente. No requiere instalar drivers adicionales ni software pesado.
-- **Optimización MIDI (Anti-Choke):** Implementa `requestAnimationFrame` (Throttle) y un sistema de caché de Control Changes (CC) para enviar mensajes MIDI solo cuando el valor cambia, evitando colgar el hardware.
+- **Optimización MIDI (Anti-Choke):** Sincroniza el envío MIDI con el ciclo de pintado del navegador (`requestAnimationFrame`) y usa una caché de estado para transmitir únicamente *deltas*, evitando colgar el bus USB del hardware.
 - **Mobile-First & Gig-Ready:** 
   - Prevención nativa de scroll y rebote táctil en pantallas móviles (`touch-action: none`).
+  - **Double-Tap to Center:** Doble toque rápido en el pad para regresar la mezcla al centro (50/50) instantáneamente.
   - **Wake Lock API:** Mantiene la pantalla encendida automáticamente durante tus presentaciones.
   - **Persistencia de Estado:** Guarda tus 4 presets cargados en el `localStorage` para sobrevivir a recargas accidentales.
+- **Personalización (Theming):** Archivo `theme.js` expuesto para modificar colores, fondos y cursores PNG sin necesidad de tocar el código fuente principal.
 - **Parseo Inteligente:** Lee archivos nativos `.hlx` (estructuras JSON) y extrae dinámicamente el bloque de procesamiento `DSP0`.
 
 ---

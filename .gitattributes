@@ -1,0 +1,5 @@
+# Normalizar todos los archivos de texto (Git decide según el OS)
+* text=auto
+
+# Forzar explícitamente LF (formato Unix) para scripts de Bash
+*.sh text eol=lf

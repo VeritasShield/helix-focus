@@ -64,7 +64,7 @@ El proyecto no tiene dependencias de Node.js (no hay `package.json` ni procesos 
 Clona el repositorio y sirve el archivo `index.html` usando cualquier servidor local ligero para evitar problemas de CORS y asegurar el contexto de seguridad (necesario para la Web MIDI API):
 
 ```bash
-git clone https://github.com/TU-USUARIO/helix-focus.git
+git clone https://github.com/VeritasShield/helix-focus.git
 cd helix-focus
 # Ejemplo usando Python:
 python3 -m http.server 8000

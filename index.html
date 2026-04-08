@@ -10,9 +10,28 @@
     <meta http-equiv="Expires" content="0">
     <title>Helix Focus</title>
     <style>
+        /* --- VARIABLES DE TEMA (POR DEFECTO) --- */
+        :root {
+            --app-bg-color: #121212;
+            --app-bg-img: none;
+            --pad-bg: radial-gradient(circle at center, #2c2c2c 0%, #151515 100%);
+            --pad-border: #ff9800;
+            --cursor-bg: rgba(255, 152, 0, 0.8);
+            --cursor-border: 3px solid #fff;
+            --title-color: #ff9800;
+            --btn-connect: #00c853;
+            --btn-info: #0288d1;
+            --btn-danger: #d32f2f;
+            --btn-file: #37474f;
+            --btn-loaded: #212121;
+        }
+
         /* --- ESTILO GENERAL (CORREGIDO PARA MÓVIL) --- */
         body { 
-            background-color: #121212; 
+            background-color: var(--app-bg-color); 
+            background-image: var(--app-bg-img);
+            background-size: cover;
+            background-position: center;
             color: #e0e0e0; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             text-align: center; 
@@ -32,7 +51,7 @@
         }
         
         h2 { 
-            color: #ff9800; 
+            color: var(--title-color); 
             font-size: 1.1rem; 
             letter-spacing: 1px; 
             margin: 10px 0 5px 0; 
@@ -71,13 +90,16 @@
             max-width: 350px;
         }
         
-        .btn-connect { flex-grow: 1; background: #00c853; color: #000; box-shadow: 0 4px 10px rgba(0, 200, 83, 0.3); }
+        .btn-connect { flex-grow: 1; background: var(--btn-connect); color: #000; box-shadow: 0 4px 10px rgba(0, 200, 83, 0.3); }
         
-        .btn-danger { background: #d32f2f; color: #fff; padding: 10px 15px; }
+        .btn-danger { background: var(--btn-danger); color: #fff; padding: 10px 15px; }
         .btn-danger:active { background: #b71c1c; }
         
+        .btn-info { background: var(--btn-info); color: #fff; padding: 10px 15px; }
+        .btn-info:active { background: #01579b; }
+        
         .btn-file { 
-            background: #37474f; color: #eceff1; 
+            background: var(--btn-file); color: #eceff1; 
             border: 1px solid #546e7a;
         }
         
@@ -91,9 +113,9 @@
         }
         
         .btn-file.loaded { 
-            background: #212121; 
-            border-color: #ff9800; 
-            color: #ff9800;
+            background: var(--btn-loaded); 
+            border-color: var(--pad-border); 
+            color: var(--pad-border);
         }
         
         input[type="file"] { display: none; }
@@ -119,8 +141,9 @@
             max-width: 350px; 
             max-height: 350px;
             
-            background: radial-gradient(circle at center, #2c2c2c 0%, #151515 100%);
-            border: 2px solid #ff9800; 
+            background: var(--pad-bg);
+            background-size: cover; background-position: center;
+            border: 2px solid var(--pad-border); 
             border-radius: 20px;
             position: relative; 
             touch-action: none;
@@ -135,8 +158,9 @@
 
         #cursor {
             width: 20px; height: 20px; 
-            background: rgba(255, 152, 0, 0.8);
-            border: 3px solid #fff; 
+            background: var(--cursor-bg);
+            background-size: contain; background-position: center; background-repeat: no-repeat;
+            border: var(--cursor-border); 
             border-radius: 50%;
             position: absolute; 
             top: 50%; left: 50%; 
@@ -161,6 +185,21 @@
             background: rgba(0,0,0,0.2); /* Fondo suave para leer mejor */
             width: 100%;
         }
+
+        /* --- MODAL NATIVO --- */
+        dialog {
+            background: #212121; color: #e0e0e0;
+            border: 1px solid #ff9800; border-radius: 12px;
+            padding: 20px; max-width: 320px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        dialog::backdrop {
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(3px);
+        }
+        dialog h3 { color: #ff9800; margin-top: 0; text-align: center; }
+        dialog p { font-size: 0.9rem; line-height: 1.5; color: #b0bec5; text-align: left; margin-bottom: 10px;}
+        dialog b { color: #fff; }
+        
     </style>
 </head>
 <body>
@@ -170,14 +209,15 @@
     <div class="controls-area">
         <div class="top-buttons">
             <button class="btn btn-connect" id="btn-con" onclick="initMIDI()">🔌 Conectar HX Stomp</button>
+            <button class="btn btn-info" onclick="document.getElementById('help-dialog').showModal()" title="Ver instrucciones">ℹ️</button>
             <button class="btn btn-danger" onclick="resetPresets()" title="Borrar todos los presets">🗑️</button>
         </div>
         
         <div class="preset-grid">
-            <label class="btn btn-file" id="lbl-0"><span id="txt-0">A (Arr-Izq)</span><input type="file" onchange="loadFile(this, 0)"></label>
-            <label class="btn btn-file" id="lbl-1"><span id="txt-1">B (Arr-Der)</span><input type="file" onchange="loadFile(this, 1)"></label>
-            <label class="btn btn-file" id="lbl-2"><span id="txt-2">C (Aba-Izq)</span><input type="file" onchange="loadFile(this, 2)"></label>
-            <label class="btn btn-file" id="lbl-3"><span id="txt-3">D (Aba-Der)</span><input type="file" onchange="loadFile(this, 3)"></label>
+            <label class="btn btn-file" id="lbl-0" title="Cargar archivo .hlx para la esquina superior izquierda"><span id="txt-0">A (Arr-Izq)</span><input type="file" onchange="loadFile(this, 0)"></label>
+            <label class="btn btn-file" id="lbl-1" title="Cargar archivo .hlx para la esquina superior derecha"><span id="txt-1">B (Arr-Der)</span><input type="file" onchange="loadFile(this, 1)"></label>
+            <label class="btn btn-file" id="lbl-2" title="Cargar archivo .hlx para la esquina inferior izquierda"><span id="txt-2">C (Aba-Izq)</span><input type="file" onchange="loadFile(this, 2)"></label>
+            <label class="btn btn-file" id="lbl-3" title="Cargar archivo .hlx para la esquina inferior derecha"><span id="txt-3">D (Aba-Der)</span><input type="file" onchange="loadFile(this, 3)"></label>
         </div>
     </div>
 
@@ -188,6 +228,37 @@
     </div>
 
     <div id="status">Esperando conexión...</div>
+
+    <dialog id="help-dialog">
+        <h3>📖 ¿Cómo usar el Pad?</h3>
+        <p><b>1.</b> Conecta tu procesador Line 6 por USB y presiona <b>Conectar HX Stomp</b>.</p>
+        <p><b>2.</b> Toca los botones <b>A, B, C y D</b> para cargar tus archivos de presets (<b>.hlx</b>).</p>
+        <p><b>3.</b> Desliza tu dedo en el Pad central. La aplicación fusionará los parámetros de los 4 presets en tiempo real según la posición de tu dedo.</p>
+        <form method="dialog" style="text-align: center; margin-top: 15px;">
+            <button class="btn btn-connect" style="width: 100%;">¡Entendido!</button>
+        </form>
+    </dialog>
+
+<!-- Script del Motor de Temas Visuales -->
+<script src="theme.js"></script>
+<script>
+    if (typeof customTheme !== 'undefined') {
+        const root = document.documentElement;
+        if(customTheme.appBgImage) root.style.setProperty('--app-bg-img', `url("${customTheme.appBgImage}")`);
+        if(customTheme.padImage) root.style.setProperty('--pad-bg', `url("${customTheme.padImage}")`);
+        if(customTheme.cursorImage) {
+            root.style.setProperty('--cursor-bg', `url("${customTheme.cursorImage}")`);
+            root.style.setProperty('--cursor-border', 'none'); // Oculta el borde blanco si se usa una imagen PNG
+        }
+        if(customTheme.btnConnect) root.style.setProperty('--btn-connect', customTheme.btnConnect);
+        if(customTheme.btnInfo) root.style.setProperty('--btn-info', customTheme.btnInfo);
+        if(customTheme.btnDanger) root.style.setProperty('--btn-danger', customTheme.btnDanger);
+        if(customTheme.btnFile) root.style.setProperty('--btn-file', customTheme.btnFile);
+        if(customTheme.btnLoaded) root.style.setProperty('--btn-loaded', customTheme.btnLoaded);
+        if(customTheme.padBorder) root.style.setProperty('--pad-border', customTheme.padBorder);
+        if(customTheme.titleColor) root.style.setProperty('--title-color', customTheme.titleColor);
+    }
+</script>
 
 <script>
     // --- LÓGICA INTERNA ---

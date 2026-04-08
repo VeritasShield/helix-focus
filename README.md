@@ -1,72 +1,94 @@
-# Helix Focus Controller
+# 🎛️ Helix Focus Controller
 
-¡Bienvenido a Helix Focus Controller! Una herramienta web para guitarristas que te permite "fusionar" hasta cuatro presets de tu Line 6 Helix en tiempo real usando un pad XY.
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![Web MIDI](https://img.shields.io/badge/Web_MIDI_API-0078D4?style=for-the-badge&logo=web&logoColor=white)
 
-Esta aplicación te permite cargar cuatro sonidos diferentes en las esquinas de un pad y mover un cursor entre ellos para crear sonidos híbridos y transiciones suaves de forma intuitiva. Es ideal para explorar nuevas texturas sonoras o para controlar múltiples parámetros de tu amplificador y efectos con un solo gesto.
+**Helix Focus** es una aplicación web *Zero-Install* diseñada para guitarristas y productores que utilizan procesadores **Line 6 (Helix, HX Stomp)**. Transforma tu dispositivo móvil o tablet en un Pad XY táctil de alta respuesta para realizar un *Morphing* (interpolación) continuo entre 4 presets (nodos) distintos en tiempo real.
 
-![Helix Focus Controller Screenshot](https://i.imgur.com/your-screenshot.png) <!-- Reemplaza esto con una captura de pantalla real -->
+## ✨ Características Principales
 
-## Descripción
+- **Interpolación Bilineal:** Mezcla parámetros de 4 archivos `.hlx` de forma fluida según las coordenadas XY del pad.
+- **Zero-Install & Cloud-Free:** 100% Vanilla JS. Todo ocurre en el navegador de tu cliente. No requiere instalar drivers adicionales ni software pesado.
+- **Optimización MIDI (Anti-Choke):** Implementa `requestAnimationFrame` (Throttle) y un sistema de caché de Control Changes (CC) para enviar mensajes MIDI solo cuando el valor cambia, evitando colgar el hardware.
+- **Mobile-First & Gig-Ready:** 
+  - Prevención nativa de scroll y rebote táctil en pantallas móviles (`touch-action: none`).
+  - **Wake Lock API:** Mantiene la pantalla encendida automáticamente durante tus presentaciones.
+  - **Persistencia de Estado:** Guarda tus 4 presets cargados en el `localStorage` para sobrevivir a recargas accidentales.
+- **Parseo Inteligente:** Lee archivos nativos `.hlx` (estructuras JSON) y extrae dinámicamente el bloque de procesamiento `DSP0`.
 
-**Helix Focus Controller** es una página web que se conecta a tu pedalera Helix (o cualquier dispositivo Line 6 compatible con MIDI) a través del navegador. No necesitas instalar nada, solo abrir el archivo `index.html` en un navegador compatible con Web MIDI (como Google Chrome).
+---
 
-La idea se basa en un "XY Pad" que tiene cuatro esquinas. En cada esquina, cargas un preset (`.hlx`). Al mover el cursor por el pad, la aplicación calcula en tiempo real una mezcla de los parámetros de los cuatro presets y envía los nuevos valores a tu Helix a través de mensajes MIDI CC.
+## 🚀 Uso Rápido (Live)
 
-Por ejemplo, puedes poner:
-- **Esquina A (Arriba-Izquierda):** Un sonido Clean.
-- **Esquina B (Arriba-Derecha):** Un sonido Crunch.
-- **Esquina C (Abajo-Izquierda):** Un sonido con mucho Delay.
-- **Esquina D (Abajo-Derecha):** Un sonido Lead con alta ganancia.
+Dado que la aplicación se apoya en GitHub Pages, puedes usarla directamente desde la web sin descargar nada:
 
-Al mover el cursor del centro hacia la esquina D, verás cómo la ganancia y el volumen suben suavemente, creando una transición perfecta para tu solo.
+1. Conecta tu procesador Line 6 a tu dispositivo mediante USB (necesitas un adaptador OTG si usas Android).
+2. Abre un navegador compatible con **Web MIDI API** (Chrome, Edge, Opera, navegadores de Android).
+3. Entra a la URL de GitHub Pages de este repositorio.
+4. Haz clic en **"Conectar HX Stomp"** y otorga permisos MIDI.
+5. Carga 4 archivos `.hlx` en las 4 esquinas del Pad (Nodos A, B, C y D).
+6. ¡Mueve el cursor en el pad para empezar el morphing!
 
-## Características
+> **⚠️ Nota de Compatibilidad:** La Web MIDI API **no** está soportada de forma nativa en Safari para iOS/iPadOS. Si usas dispositivos Apple móviles, requerirás aplicaciones puente especiales como *Web MIDI Browser*.
 
-- **Control XY en tiempo real:** Interpola parámetros entre cuatro presets.
-- **Carga de archivos `.hlx`:** Usa tus propios presets de Helix.
-- **Conexión Web MIDI:** No requiere software adicional, solo un navegador compatible.
-- **Interfaz sencilla:** Carga, conecta y toca.
-- **Personalizable:** Puedes cambiar fácilmente qué parámetros de Helix quieres controlar (Ganancia, EQ, Volumen, etc.).
-- **Responsive:** Funciona en ordenadores y dispositivos táctiles como tablets.
+---
 
-## ¿Cómo funciona?
+## 🧮 Cómo Funciona (El Motor Matemático)
 
-1.  **Conecta tu Helix:** Conecta tu pedalera Helix a tu ordenador mediante un cable USB. Si usas un móvil o tablet, necesitarás un adaptador OTG.
-2.  **Abre la aplicación:** Abre el archivo `index.html` en Google Chrome u otro navegador que soporte Web MIDI.
-3.  **Conecta el MIDI:** Pulsa el botón **"🔌 Conectar USB MIDI"**. El navegador te pedirá permiso para acceder a tus dispositivos MIDI. Selecciona tu Helix.
-4.  **Carga tus Presets:** Usa los botones **"📂 Cargar A/B/C/D"** para asignar un archivo `.hlx` a cada una de las cuatro esquinas del pad.
-5.  **¡A tocar!:** Mueve el cursor en el pad XY con el ratón o con el dedo. Escucharás cómo el sonido de tu Helix cambia en tiempo real.
+El sistema utiliza **Interpolación Bilineal** para calcular el valor de salida de los parámetros hacia el Helix. 
+Al mover el cursor, el eje `X` (0.0 - 1.0) pondera la influencia horizontal entre los presets de la izquierda y la derecha. El eje `Y` (0.0 - 1.0) pondera la mezcla vertical.
 
-## Requisitos
+Esto permite que, si arrastras el cursor hacia el centro absoluto (0.5, 0.5), tu tono de guitarra será un promedio exacto de los 4 archivos `.hlx` cargados.
 
-- **Hardware:**
-    - Pedalera Line 6 Helix, HX Stomp, o similar compatible con MIDI CC.
-    - Cable USB (y adaptador OTG si usas un dispositivo móvil).
-- **Software:**
-    - Un navegador web compatible con la API **Web MIDI**. Google Chrome es la opción recomendada.
+### Mapa de Controladores (CC Default)
+Actualmente el motor extrae e interpola los siguientes parámetros del bloque de amplificador:
 
-## Personalización
+| Parámetro       | MIDI CC | Rango  |
+|-----------------|---------|--------|
+| Drive           | 4       | 0 - 127|
+| Bass            | 5       | 0 - 127|
+| Mid             | 6       | 0 - 127|
+| Treble          | 7       | 0 - 127|
+| Presence        | 8       | 0 - 127|
+| Master          | 9       | 0 - 127|
+| Channel Volume  | 10      | 0 - 127|
 
-Puedes decidir qué parámetros de tu preset quieres que se modifiquen. Para ello, tienes que editar el código fuente de `index.html`.
+---
 
-Busca la siguiente sección en el código JavaScript:
+## 💻 Desarrollo Local
 
-```javascript
-// --- CONFIGURACIÓN DE MAPEO MIDI (CC) ---
-// Estos números deben coincidir con lo que configures en tu Helix
-// Command Center > Instant Commands o Controller Assign
-const CC_MAP = {
-    "Drive": 4,  "Bass": 5,   "Mid": 6, 
-    "Treble": 7, "Presence": 8, "Master": 9,
-    "ChVol": 10, "Mix": 11, "Decay": 12
-};
+El proyecto no tiene dependencias de Node.js (no hay `package.json` ni procesos de `build`).
+
+### 1. Ejecución
+Clona el repositorio y sirve el archivo `index.html` usando cualquier servidor local ligero para evitar problemas de CORS y asegurar el contexto de seguridad (necesario para la Web MIDI API):
+
+```bash
+git clone https://github.com/TU-USUARIO/helix-focus.git
+cd helix-focus
+# Ejemplo usando Python:
+python3 -m http.server 8000
+# O usando npx:
+npx serve .
 ```
 
-- La **clave** (ej. `"Drive"`) es el nombre del parámetro en el archivo `.hlx`.
-- El **valor** (ej. `4`) es el número de **MIDI CC** que tu Helix espera para controlar ese parámetro.
+### 2. Despliegue Automatizado
+El repositorio incluye un script Bash (`deploy.sh`) preparado para entornos profesionales. Automatiza la validación de la rama activa, empaqueta los archivos modificados, genera un commit estandarizado y empuja los cambios a GitHub para disparar el CI/CD nativo de GitHub Pages.
 
-Asegúrate de que los números de CC en este código coincidan con la configuración de tu Helix (en `Command Center` o `Controller Assign`).
+```bash
+# Dar permisos de ejecución (solo la primera vez)
+chmod +x deploy.sh
 
-## Licencia
+# Subir cambios a producción
+./deploy.sh
+```
+*Nota: El script aplica un candado de seguridad y solo permite despliegues desde la rama `main` o `master`.*
 
-Este proyecto está bajo la Licencia MIT. Eres libre de usarlo, modificarlo y distribuirlo.
+---
+
+## 📄 Licencia
+
+Este proyecto está distribuido bajo la licencia **MIT**. Consulta el archivo `LICENSE.md` para más información.
+
+---
+*Disclaimer: Este proyecto no está afiliado, asociado, autorizado, respaldado por, ni conectado de ninguna manera oficial con Line 6, Inc. Helix y HX Stomp son marcas registradas de Line 6.*

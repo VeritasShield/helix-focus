@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- Prevención estricta de caché para móviles (Safari/Chrome) -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Helix Focus</title>
     <style>
         /* --- ESTILO GENERAL (CORREGIDO PARA MÓVIL) --- */
@@ -53,20 +58,38 @@
             border: none; 
             font-weight: 600; 
             cursor: pointer; 
-            width: 80%; 
-            max-width: 300px;
             font-size: 0.85rem; 
             transition: transform 0.1s;
             display: flex; align-items: center; justify-content: center; gap: 8px;
         }
         .btn:active { transform: scale(0.97); }
         
-        .btn-connect { background: #00c853; color: #000; box-shadow: 0 4px 10px rgba(0, 200, 83, 0.3); }
+        .top-buttons {
+            display: flex;
+            gap: 8px;
+            width: 90%;
+            max-width: 350px;
+        }
+        
+        .btn-connect { flex-grow: 1; background: #00c853; color: #000; box-shadow: 0 4px 10px rgba(0, 200, 83, 0.3); }
+        
+        .btn-danger { background: #d32f2f; color: #fff; padding: 10px 15px; }
+        .btn-danger:active { background: #b71c1c; }
         
         .btn-file { 
             background: #37474f; color: #eceff1; 
             border: 1px solid #546e7a;
         }
+        
+        /* Grid para los 4 presets */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            width: 90%;
+            max-width: 350px;
+        }
+        
         .btn-file.loaded { 
             background: #212121; 
             border-color: #ff9800; 
@@ -145,12 +168,17 @@
     <h2>🎛️ Helix Focus</h2>
 
     <div class="controls-area">
-        <button class="btn btn-connect" id="btn-con" onclick="initMIDI()">🔌 Conectar HX Stomp</button>
+        <div class="top-buttons">
+            <button class="btn btn-connect" id="btn-con" onclick="initMIDI()">🔌 Conectar HX Stomp</button>
+            <button class="btn btn-danger" onclick="resetPresets()" title="Borrar todos los presets">🗑️</button>
+        </div>
         
-        <label class="btn btn-file" id="lbl-file">
-            📂 Cargar Archivo .hlx
-            <input type="file" onchange="loadFile(this)">
-        </label>
+        <div class="preset-grid">
+            <label class="btn btn-file" id="lbl-0"><span id="txt-0">A (Arr-Izq)</span><input type="file" onchange="loadFile(this, 0)"></label>
+            <label class="btn btn-file" id="lbl-1"><span id="txt-1">B (Arr-Der)</span><input type="file" onchange="loadFile(this, 1)"></label>
+            <label class="btn btn-file" id="lbl-2"><span id="txt-2">C (Aba-Izq)</span><input type="file" onchange="loadFile(this, 2)"></label>
+            <label class="btn btn-file" id="lbl-3"><span id="txt-3">D (Aba-Der)</span><input type="file" onchange="loadFile(this, 3)"></label>
+        </div>
     </div>
 
     <div id="pad-wrapper">
@@ -162,58 +190,120 @@
     <div id="status">Esperando conexión...</div>
 
 <script>
-    // --- LÓGICA INTERNA (Igual que antes) ---
+    // --- LÓGICA INTERNA ---
     const CC_MAP = { "Drive": 4, "Bass": 5, "Mid": 6, "Treble": 7, "Presence": 8, "ChVol": 10, "Master": 9 };
     let midiOut = null;
-    let baseParams = {}; 
+    let presets = [null, null, null, null]; // [TL, TR, BL, BR]
+    let lastSentCC = {}; // Caché para evitar saturación MIDI
+    const STORAGE_KEY = 'helix_focus_presets';
+    const NODE_LABELS = ["A (Arr-Izq)", "B (Arr-Der)", "C (Aba-Izq)", "D (Aba-Der)"];
+    let wakeLock = null;
 
-async function initMIDI() {
+    // Caché de elementos DOM y utilidades
+    const statusEl = document.getElementById('status');
+    const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+
+    // Carga inicial desde LocalStorage
+    window.addEventListener('DOMContentLoaded', () => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            presets = JSON.parse(saved);
+            updateUI();
+        }
+    });
+
+    // --- WAKE LOCK API (Evitar apagado de pantalla) ---
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+            } catch (err) {
+                console.warn('Wake Lock denegado/no soportado:', err.message);
+            }
+        }
+    }
+
+    // Requiere interacción del usuario para activarse
+    document.addEventListener('pointerdown', requestWakeLock, { once: true });
+    
+    // Re-solicitar si el usuario cambia de pestaña y vuelve
+    document.addEventListener('visibilitychange', () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock();
+    });
+
+    // --- RESET PRESETS ---
+    function resetPresets() {
+        if(!confirm("¿Estás seguro de que quieres borrar los 4 presets de la memoria?")) return;
+        localStorage.removeItem(STORAGE_KEY);
+        presets = [null, null, null, null];
+        
+        presets.forEach((_, i) => {
+            document.getElementById(`lbl-${i}`).classList.remove('loaded');
+            document.getElementById(`txt-${i}`).innerText = NODE_LABELS[i];
+        });
+        statusEl.innerText = "🗑️ Memoria borrada. Listo para cargar.";
+    }
+
+    function updateUI() {
+        let loadedCount = 0;
+        presets.forEach((p, i) => {
+            if (!p) return;
+            loadedCount++;
+            document.getElementById(`lbl-${i}`).classList.add('loaded');
+            document.getElementById(`txt-${i}`).innerText = `✅ Node ${['A','B','C','D'][i]}`;
+        });
+        statusEl.innerText = loadedCount === 4 ? "✅ Todos los nodos listos!" : `Nodos cargados: ${loadedCount}/4`;
+    }
+
+    async function initMIDI() {
         try {
             const access = await navigator.requestMIDIAccess();
             const outputs = Array.from(access.outputs.values());
             midiOut = outputs.find(o => o.name.includes("Helix") || o.name.includes("HX") || o.name.includes("Line 6")) || outputs[0];
             if(midiOut) {
-                // Actualiza el botón superior
                 document.getElementById('btn-con').innerHTML = "✅ <b>" + midiOut.name + "</b>";
                 document.getElementById('btn-con').style.background = "#b9f6ca";
-                
-                // CORRECCIÓN 1: Actualiza el monitor de estado en la parte inferior
-                document.getElementById('status').innerText = "Conectado a: " + midiOut.name;
+                statusEl.innerText = "Conectado a: " + midiOut.name;
+            } else {
+                statusEl.innerText = "❌ No se encontró dispositivo Line 6.";
             }
-        } catch(e) { alert("Error: No se detectó MIDI USB"); }
+        } catch(e) { statusEl.innerText = "❌ Error: Permiso MIDI denegado o no soportado."; }
     }
 
-    function loadFile(input) {
+    // Función pura de extracción recursiva
+    function extractHelixParams(obj, target) {
+        if (!obj || typeof obj !== 'object') return;
+        for (const key in obj) {
+            if (CC_MAP[key] !== undefined && typeof obj[key] === 'number') {
+                target[key] = obj[key];
+            } else if (typeof obj[key] === 'object') {
+                extractHelixParams(obj[key], target);
+            }
+        }
+    }
+
+    function loadFile(input, index) {
         const file = input.files[0];
         if(!file) return;
         const reader = new FileReader();
         
         reader.onload = (e) => {
             try {
-                // CORRECCIÓN 2: Normalizar el JSON como hacías en tu código anterior
                 const json = JSON.parse(e.target.result);
-                const txt = JSON.stringify(json);
-                
-                Object.keys(CC_MAP).forEach(k => {
-                    // Agregamos la 'g' (global) para un escaneo más robusto
-                    const regex = new RegExp(`"${k}":\\s*([0-9.]+)`, 'g');
-                    const match = regex.exec(txt);
-                    if(match) baseParams[k] = parseFloat(match[1]);
-                });
+                let tempParams = {};
+                extractHelixParams(json, tempParams);
 
-                if(Object.keys(baseParams).length > 0) {
-                    document.getElementById('lbl-file').classList.add('loaded');
-                    
-                    // CORRECCIÓN 3: Volvemos a inyectar el <input type="file"> para no romper el botón
-                    document.getElementById('lbl-file').innerHTML = `✅ ${file.name.substring(0,18)}... <input type="file" onchange="loadFile(this)">`;
-                    
-                    document.getElementById('status').innerText = "Listo para tocar";
+                if(Object.keys(tempParams).length > 0) {
+                    presets[index] = tempParams;
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
+                    updateUI();
                 } else {
-                    alert("Error: Archivo inválido o sin Amplificador.");
+                    statusEl.innerText = "❌ Error: Archivo sin parámetros válidos.";
                 }
             } catch (err) {
-                alert("Error al leer: Asegúrate de que es un archivo .hlx válido.");
+                statusEl.innerText = "❌ Error: Asegúrate de que es un .hlx válido.";
             }
+            input.value = ""; // Permite recargar el mismo archivo si hubo error
         };
         reader.readAsText(file);
     }
@@ -221,55 +311,69 @@ async function initMIDI() {
     // --- JOYSTICK LOGIC ---
     const pad = document.getElementById('pad-container');
     const cursor = document.getElementById('cursor');
+    let isThrottled = false;
+    let pendingX = 0.5, pendingY = 0.5;
 
     pad.addEventListener('pointermove', (e) => {
         if(!e.isPrimary) return;
         if(e.pointerType === 'mouse' && e.buttons === 0) return; 
 
         const rect = pad.getBoundingClientRect();
-        let x = (e.clientX - rect.left) / rect.width;
-        let y = (e.clientY - rect.top) / rect.height;
+        pendingX = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+        pendingY = clamp((e.clientY - rect.top) / rect.height, 0, 1);
         
-        x = Math.max(0, Math.min(1, x));
-        y = Math.max(0, Math.min(1, y));
-
-        cursor.style.left = (x * 100) + '%';
-        cursor.style.top = (y * 100) + '%';
+        cursor.style.left = (pendingX * 100) + '%';
+        cursor.style.top = (pendingY * 100) + '%';
         
-        calculateAndSend(x, y);
+        if (!isThrottled) {
+            isThrottled = true;
+            requestAnimationFrame(() => {
+                calculateAndSend(pendingX, pendingY);
+                isThrottled = false;
+            });
+        }
     });
 
     pad.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
     function calculateAndSend(x, y) {
-        if(Object.keys(baseParams).length === 0) return;
+        // Bloquear interpolación si faltan presets
+        if(presets.includes(null)) {
+            statusEl.innerText = "⚠️ Requiere los 4 presets para interpolar.";
+            return;
+        }
+        
         let msg = "";
 
-        Object.keys(baseParams).forEach(key => {
-            if(CC_MAP[key]) {
-                const baseVal = baseParams[key];
-                let finalVal = baseVal;
+        // Efecto visual dinámico basado en la distancia desde el centro
+        const dist = Math.sqrt(Math.pow(x - 0.5, 2) + Math.pow(y - 0.5, 2)) * 2;
+        cursor.style.boxShadow = `0 0 ${15 + (dist * 20)}px rgba(255, 152, 0, ${0.6 + (dist * 0.4)})`;
 
-                if (key === "Drive") {
-                    finalVal = baseVal + ((0.5 - y) * 8.0);
-                }
-                if (key === "Presence" || key === "Treble") {
-                    finalVal = baseVal + ((x - 0.5) * 4.0);
-                }
-                if (key === "ChVol" || key === "Master") {
-                    finalVal = baseVal + ((x - 0.5) * 3.0);
-                }
+        Object.keys(CC_MAP).forEach(key => {
+            if(CC_MAP[key]) {
+                // Extraer el valor de este parámetro para las 4 esquinas (Por defecto 5.0 si no existe)
+                const valA = presets[0][key] ?? 5.0; // Top-Left
+                const valB = presets[1][key] ?? 5.0; // Top-Right
+                const valC = presets[2][key] ?? 5.0; // Bottom-Left
+                const valD = presets[3][key] ?? 5.0; // Bottom-Right
+
+                // INTERPOLACIÓN BILINEAL
+                const blendTop = valA * (1 - x) + valB * x;
+                const blendBottom = valC * (1 - x) + valD * x;
+                const finalVal = blendTop * (1 - y) + blendBottom * y;
 
                 let midiVal = Math.floor(finalVal * 12.7);
-                midiVal = Math.max(0, Math.min(127, midiVal));
+                midiVal = clamp(midiVal, 0, 127);
 
-                if(midiOut) midiOut.send([0xB0, CC_MAP[key], midiVal]);
-                
-                if(key === "Drive") msg += `DRIVE: ${(midiVal/12.7).toFixed(1)}  `;
-                if(key === "Presence") msg += `PRES: ${(midiVal/12.7).toFixed(1)}`;
+                if(lastSentCC[key] !== midiVal) {
+                    if(midiOut) midiOut.send([0xB0, CC_MAP[key], midiVal]);
+                    lastSentCC[key] = midiVal;
+                }
+                if(key === "Drive") msg += `DRV: ${(midiVal/12.7).toFixed(1)}  `;
+                if(key === "Treble") msg += `TRB: ${(midiVal/12.7).toFixed(1)}`;
             }
         });
-        document.getElementById('status').innerText = msg;
+        if (msg) statusEl.innerText = msg;
     }
 </script>
 </body>

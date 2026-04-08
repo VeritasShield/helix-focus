@@ -9,7 +9,14 @@ yarn-error.log*
 
 # Ignorar archivos de sistema operativo
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
 
 # Ignorar carpetas de editores de código
 .idea/

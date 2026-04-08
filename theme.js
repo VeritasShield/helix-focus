@@ -5,13 +5,16 @@
 // Si dejas un valor vacío "", se aplicará el diseño por defecto.
 
 const customTheme = {
-    // --- FONDOS E IMÁGENES (Usa rutas locales, ej: "fondo.png") ---
+    // --- FONDOS E IMÁGENES (Usa rutas locales, ej: "assets/img/fondo.png") ---
     appBgImage: "",         // Imagen de fondo de toda la aplicación
     padImage: "",           // Imagen para el fondo del Pad XY
-    cursorImage: "",        // Imagen PNG para el puntero/cursor (ej: "mira.png")
+    cursorImage: "",        // Imagen PNG para el puntero/cursor (ej: "assets/img/mira.png")
 
     // --- COLORES PRINCIPALES (Usa HEX, ej: "#ff9800") ---
+    appBgColor: "",         // Color de fondo sólido (si no usas imagen)
+    textColor: "",          // Color del texto general de la aplicación
     titleColor: "",         // Color del título "Helix Focus"
+    cursorColor: "",        // Color del cursor (si no usas imagen)
     padBorder: "",          // Color del borde del Pad y de los botones activos
 
     // --- COLORES DE BOTONES ---

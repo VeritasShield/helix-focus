@@ -8,6 +8,14 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    
+    <!-- PWA Manifest y Meta Tags para iOS -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121212">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="assets/img/icon-192.png">
+    
     <title>Helix Focus</title>
     <style>
         /* --- VARIABLES DE TEMA (POR DEFECTO) --- */
@@ -15,6 +23,7 @@
             --app-bg-color: #121212;
             --app-bg-img: none;
             --pad-bg: radial-gradient(circle at center, #2c2c2c 0%, #151515 100%);
+            --text-color: #e0e0e0;
             --pad-border: #ff9800;
             --cursor-bg: rgba(255, 152, 0, 0.8);
             --cursor-border: 3px solid #fff;
@@ -32,7 +41,7 @@
             background-image: var(--app-bg-img);
             background-size: cover;
             background-position: center;
-            color: #e0e0e0; 
+            color: var(--text-color); 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             text-align: center; 
             margin: 0; 
@@ -208,7 +217,7 @@
 
     <div class="controls-area">
         <div class="top-buttons">
-            <button class="btn btn-connect" id="btn-con" onclick="initMIDI()">🔌 Conectar HX Stomp</button>
+            <button class="btn btn-connect" id="btn-con" onclick="toggleMIDI()">🔌 Conectar HX Stomp</button>
             <button class="btn btn-info" onclick="document.getElementById('help-dialog').showModal()" title="Ver instrucciones">ℹ️</button>
             <button class="btn btn-danger" onclick="resetPresets()" title="Borrar todos los presets">🗑️</button>
         </div>
@@ -232,7 +241,7 @@
     <dialog id="help-dialog">
         <h3>📖 ¿Cómo usar el Pad?</h3>
         <p><b>1.</b> Conecta tu procesador Line 6 por USB y presiona <b>Conectar HX Stomp</b>.</p>
-        <p><b>2.</b> Toca los botones <b>A, B, C y D</b> para cargar tus archivos de presets (<b>.hlx</b>).</p>
+        <p><b>2.</b> Carga 4 presets (<b>.hlx</b>) distintos en los botones <b>A, B, C y D</b>. Cada botón representa una esquina del Pad. <i>Consejo: Piensa en ellos como tus límites sonoros (Ej. A: Clean, B: Crunch, C: Lead, D: Ambient).</i></p>
         <p><b>3.</b> Desliza tu dedo en el Pad central. La aplicación fusionará los parámetros de los 4 presets en tiempo real según la posición de tu dedo.</p>
         <form method="dialog" style="text-align: center; margin-top: 15px;">
             <button class="btn btn-connect" style="width: 100%;">¡Entendido!</button>
@@ -245,10 +254,14 @@
     if (typeof customTheme !== 'undefined') {
         const root = document.documentElement;
         if(customTheme.appBgImage) root.style.setProperty('--app-bg-img', `url("${customTheme.appBgImage}")`);
+        if(customTheme.appBgColor) root.style.setProperty('--app-bg-color', customTheme.appBgColor);
+        if(customTheme.textColor) root.style.setProperty('--text-color', customTheme.textColor);
         if(customTheme.padImage) root.style.setProperty('--pad-bg', `url("${customTheme.padImage}")`);
         if(customTheme.cursorImage) {
             root.style.setProperty('--cursor-bg', `url("${customTheme.cursorImage}")`);
             root.style.setProperty('--cursor-border', 'none'); // Oculta el borde blanco si se usa una imagen PNG
+        } else if (customTheme.cursorColor) {
+            root.style.setProperty('--cursor-bg', customTheme.cursorColor);
         }
         if(customTheme.btnConnect) root.style.setProperty('--btn-connect', customTheme.btnConnect);
         if(customTheme.btnInfo) root.style.setProperty('--btn-info', customTheme.btnInfo);
@@ -260,192 +273,10 @@
     }
 </script>
 
-<script>
-    // --- LÓGICA INTERNA ---
-    const CC_MAP = { "Drive": 4, "Bass": 5, "Mid": 6, "Treble": 7, "Presence": 8, "ChVol": 10, "Master": 9 };
-    let midiOut = null;
-    let presets = [null, null, null, null]; // [TL, TR, BL, BR]
-    let lastSentCC = {}; // Caché para evitar saturación MIDI
-    const STORAGE_KEY = 'helix_focus_presets';
-    const NODE_LABELS = ["A (Arr-Izq)", "B (Arr-Der)", "C (Aba-Izq)", "D (Aba-Der)"];
-    let wakeLock = null;
+<div id="update-banner" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #00c853; color: #000; padding: 12px 25px; border-radius: 30px; font-weight: bold; cursor: pointer; z-index: 9999; box-shadow: 0 5px 20px rgba(0,0,0,0.8); text-align: center;">
+    🚀 ¡Actualización disponible!<br><span style="font-size:0.8rem; font-weight:normal;">Toca para recargar</span>
+</div>
 
-    // Caché de elementos DOM y utilidades
-    const statusEl = document.getElementById('status');
-    const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
-
-    // Carga inicial desde LocalStorage
-    window.addEventListener('DOMContentLoaded', () => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            presets = JSON.parse(saved);
-            updateUI();
-        }
-    });
-
-    // --- WAKE LOCK API (Evitar apagado de pantalla) ---
-    async function requestWakeLock() {
-        if ('wakeLock' in navigator) {
-            try {
-                wakeLock = await navigator.wakeLock.request('screen');
-            } catch (err) {
-                console.warn('Wake Lock denegado/no soportado:', err.message);
-            }
-        }
-    }
-
-    // Requiere interacción del usuario para activarse
-    document.addEventListener('pointerdown', requestWakeLock, { once: true });
-    
-    // Re-solicitar si el usuario cambia de pestaña y vuelve
-    document.addEventListener('visibilitychange', () => {
-        if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock();
-    });
-
-    // --- RESET PRESETS ---
-    function resetPresets() {
-        if(!confirm("¿Estás seguro de que quieres borrar los 4 presets de la memoria?")) return;
-        localStorage.removeItem(STORAGE_KEY);
-        presets = [null, null, null, null];
-        
-        presets.forEach((_, i) => {
-            document.getElementById(`lbl-${i}`).classList.remove('loaded');
-            document.getElementById(`txt-${i}`).innerText = NODE_LABELS[i];
-        });
-        statusEl.innerText = "🗑️ Memoria borrada. Listo para cargar.";
-    }
-
-    function updateUI() {
-        let loadedCount = 0;
-        presets.forEach((p, i) => {
-            if (!p) return;
-            loadedCount++;
-            document.getElementById(`lbl-${i}`).classList.add('loaded');
-            document.getElementById(`txt-${i}`).innerText = `✅ Node ${['A','B','C','D'][i]}`;
-        });
-        statusEl.innerText = loadedCount === 4 ? "✅ Todos los nodos listos!" : `Nodos cargados: ${loadedCount}/4`;
-    }
-
-    async function initMIDI() {
-        try {
-            const access = await navigator.requestMIDIAccess();
-            const outputs = Array.from(access.outputs.values());
-            midiOut = outputs.find(o => o.name.includes("Helix") || o.name.includes("HX") || o.name.includes("Line 6")) || outputs[0];
-            if(midiOut) {
-                document.getElementById('btn-con').innerHTML = "✅ <b>" + midiOut.name + "</b>";
-                document.getElementById('btn-con').style.background = "#b9f6ca";
-                statusEl.innerText = "Conectado a: " + midiOut.name;
-            } else {
-                statusEl.innerText = "❌ No se encontró dispositivo Line 6.";
-            }
-        } catch(e) { statusEl.innerText = "❌ Error: Permiso MIDI denegado o no soportado."; }
-    }
-
-    // Función pura de extracción recursiva
-    function extractHelixParams(obj, target) {
-        if (!obj || typeof obj !== 'object') return;
-        for (const key in obj) {
-            if (CC_MAP[key] !== undefined && typeof obj[key] === 'number') {
-                target[key] = obj[key];
-            } else if (typeof obj[key] === 'object') {
-                extractHelixParams(obj[key], target);
-            }
-        }
-    }
-
-    function loadFile(input, index) {
-        const file = input.files[0];
-        if(!file) return;
-        const reader = new FileReader();
-        
-        reader.onload = (e) => {
-            try {
-                const json = JSON.parse(e.target.result);
-                let tempParams = {};
-                extractHelixParams(json, tempParams);
-
-                if(Object.keys(tempParams).length > 0) {
-                    presets[index] = tempParams;
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
-                    updateUI();
-                } else {
-                    statusEl.innerText = "❌ Error: Archivo sin parámetros válidos.";
-                }
-            } catch (err) {
-                statusEl.innerText = "❌ Error: Asegúrate de que es un .hlx válido.";
-            }
-            input.value = ""; // Permite recargar el mismo archivo si hubo error
-        };
-        reader.readAsText(file);
-    }
-    
-    // --- JOYSTICK LOGIC ---
-    const pad = document.getElementById('pad-container');
-    const cursor = document.getElementById('cursor');
-    let isThrottled = false;
-    let pendingX = 0.5, pendingY = 0.5;
-
-    pad.addEventListener('pointermove', (e) => {
-        if(!e.isPrimary) return;
-        if(e.pointerType === 'mouse' && e.buttons === 0) return; 
-
-        const rect = pad.getBoundingClientRect();
-        pendingX = clamp((e.clientX - rect.left) / rect.width, 0, 1);
-        pendingY = clamp((e.clientY - rect.top) / rect.height, 0, 1);
-        
-        cursor.style.left = (pendingX * 100) + '%';
-        cursor.style.top = (pendingY * 100) + '%';
-        
-        if (!isThrottled) {
-            isThrottled = true;
-            requestAnimationFrame(() => {
-                calculateAndSend(pendingX, pendingY);
-                isThrottled = false;
-            });
-        }
-    });
-
-    pad.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-
-    function calculateAndSend(x, y) {
-        // Bloquear interpolación si faltan presets
-        if(presets.includes(null)) {
-            statusEl.innerText = "⚠️ Requiere los 4 presets para interpolar.";
-            return;
-        }
-        
-        let msg = "";
-
-        // Efecto visual dinámico basado en la distancia desde el centro
-        const dist = Math.sqrt(Math.pow(x - 0.5, 2) + Math.pow(y - 0.5, 2)) * 2;
-        cursor.style.boxShadow = `0 0 ${15 + (dist * 20)}px rgba(255, 152, 0, ${0.6 + (dist * 0.4)})`;
-
-        Object.keys(CC_MAP).forEach(key => {
-            if(CC_MAP[key]) {
-                // Extraer el valor de este parámetro para las 4 esquinas (Por defecto 5.0 si no existe)
-                const valA = presets[0][key] ?? 5.0; // Top-Left
-                const valB = presets[1][key] ?? 5.0; // Top-Right
-                const valC = presets[2][key] ?? 5.0; // Bottom-Left
-                const valD = presets[3][key] ?? 5.0; // Bottom-Right
-
-                // INTERPOLACIÓN BILINEAL
-                const blendTop = valA * (1 - x) + valB * x;
-                const blendBottom = valC * (1 - x) + valD * x;
-                const finalVal = blendTop * (1 - y) + blendBottom * y;
-
-                let midiVal = Math.floor(finalVal * 12.7);
-                midiVal = clamp(midiVal, 0, 127);
-
-                if(lastSentCC[key] !== midiVal) {
-                    if(midiOut) midiOut.send([0xB0, CC_MAP[key], midiVal]);
-                    lastSentCC[key] = midiVal;
-                }
-                if(key === "Drive") msg += `DRV: ${(midiVal/12.7).toFixed(1)}  `;
-                if(key === "Treble") msg += `TRB: ${(midiVal/12.7).toFixed(1)}`;
-            }
-        });
-        if (msg) statusEl.innerText = msg;
-    }
-</script>
+<script src="app.js"></script>
 </body>
 </html>

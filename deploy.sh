@@ -27,6 +27,12 @@ if [ -z "$(git status --porcelain)" ]; then
     exit 0
 fi
 
+# --- AUTO-BUMP CACHE VERSION ---
+# Solo actualizamos la caché si realmente detectamos que hiciste cambios
+TIMESTAMP=$(date +"%s")
+sed -i "s/^const CACHE_NAME.*/const CACHE_NAME = 'helix-focus-$TIMESTAMP';/" sw.js
+git add sw.js
+
 # --- CONSTRUCCIÓN DEL COMMIT PROFESIONAL ---
 DATE=$(date +"%Y-%m-%d %H:%M:%S")
 TOTAL_FILES=$(git diff --name-only --cached | wc -l)
